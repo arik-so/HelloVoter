@@ -540,6 +540,9 @@ async function claimTriplers(req, res) {
     }
   });
 
+  const triplerStatuses = claims.map(c => c.otherNode().get('status')); // get the confirmation status
+  const confirmedTriplerCount = triplerStatuses.filter(s => s === 'confirmed').length; // count the matches
+
   if(stripeAccount) {
     // we only check 1099 requirements for Stripe users
     const meets1099Requirements = await stripeSvc.meets1099Requirements(ambassador);
@@ -547,9 +550,6 @@ async function claimTriplers(req, res) {
       // this ambassador hasn't completed Stripe's KYC flow, so additional constraints apply
       const disbursementLimit = ov_config.needs_additional_1099_data_tripler_disbursement_limit;
       const perTriplerPaymentAmount = ov_config.payout_per_tripler;
-
-      const triplerStatuses = claims.map(c => c.otherNode().get('status')); // get the confirmation status
-      const confirmedTriplerCount = triplerStatuses.filter(s => s === 'confirmed').length; // count the matches
 
       const disbursedAmount = perTriplerPaymentAmount * confirmedTriplerCount;
       if (disbursedAmount >= disbursementLimit) {
@@ -564,8 +564,10 @@ async function claimTriplers(req, res) {
 
   const remainingClaimableTriplerCount = triplerLimit - claimedTriplerCount;
 
-  if (req.body.triplers.length > remainingClaimableTriplerCount) {
-    return error(400, res, 'Invalid request, attempting to claim too many triplers.');
+  // if (req.body.triplers.length > remainingClaimableTriplerCount) {
+  if (confirmedTriplerCount >= triplerLimit) {
+    // return error(400, res, 'Invalid request, attempting to claim too many triplers.');
+    return error(400, res, 'Invalid request, maximum number of confirmed triplers has been reached.');
   }
 
   let query = `
